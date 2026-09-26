@@ -84,7 +84,7 @@ write_block() {
   if [[ $format == lua ]]; then
     cat <<'EOF'
 hl.config({ input = { kb_layout = "us,fr", kb_variant = "intl," } })
-hl.bind("CONTROL + ALT + SPACE", hl.dsp.exec_cmd("~/.local/bin/omarchy-keyboard toggle"))
+hl.bind("CONTROL + ALT + SPACE", hl.dsp.exec_cmd("~/.local/bin/omarchy-keyboard toggle"), { description = "Toggle keyboard layout" })
 EOF
   else
     cat <<'EOF'
@@ -98,12 +98,20 @@ EOF
   printf '%s\n' "$end"
 }
 devices() { hyprctl -j devices; }
+# Hyprland exposes the software keyboards created by input methods (fcitx5,
+# ibus, ...) among the regular keyboards. They keep their own layout, which is
+# not covered by kb_layout, and they are often flagged as main. They must be
+# left out of both the layout check and the source of the toggle direction.
+real='map(select(.name | startswith("hl-virtual-keyboard-") | not))'
+real_layouts='.keyboards | '"$real"' | length > 0 and all(.[]; .layout == "us,fr" and .variant == "intl,")'
+real_synced='.keyboards | '"$real"' | length > 0 and all(.[]; .active_layout_index == $index)'
+real_current='(.keyboards | '"$real"' | map(select(.main)) | .[0]).active_layout_index // (.keyboards | '"$real"' | .[0].active_layout_index)'
 check_layouts() {
-  jq -e '.keyboards | length > 0 and all(.[]; .layout == "us,fr" and .variant == "intl,")' \
+  jq -e "$real_layouts" \
     <<< "$1" >/dev/null || die 'Les claviers doivent utiliser us,fr / intl,. Lance install ; verifie les overrides par peripherique.'
 }
 show_status() {
-  jq -r '.keyboards[] | "\(.name) : \(.active_keymap)\(if .main then " [principal]" else "" end)"' <<< "$1"
+  jq -r '.keyboards[] | "\(.name) : \(.active_keymap)\(if (.name | startswith("hl-virtual-keyboard-")) then " [virtuel]" elif .main then " [principal]" else "" end)"' <<< "$1"
 }
 
 action=${1:-toggle}
@@ -181,7 +189,7 @@ case $action in
   azerty) index=1 ;;
   toggle)
     # Query the real compositor state, not a potentially stale state file.
-    current=$(jq -er '(.keyboards | map(select(.main)) | .[0]).active_layout_index // .keyboards[0].active_layout_index' <<< "$snapshot") \
+    current=$(jq -er "$real_current" <<< "$snapshot") \
       || die 'Hyprland ne fournit pas active_layout_index. Utilise qwerty ou azerty, ou mets Hyprland a jour.'
     case $current in
       0) index=1 ;;
@@ -192,7 +200,7 @@ case $action in
 esac
 hypr_ok switchxkblayout all "$index"
 snapshot=$(devices)
-jq -e --argjson index "$index" '.keyboards | length > 0 and all(.[]; .active_layout_index == $index)' \
+jq -e --argjson index "$index" "$real_synced" \
   <<< "$snapshot" >/dev/null || die 'La bascule n’a pas ete confirmee pour tous les claviers.'
 show_status "$snapshot"
 if [[ $index == 0 ]]; then label='QWERTY US International'; else label='AZERTY francais'; fi

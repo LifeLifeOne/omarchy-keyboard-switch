@@ -28,7 +28,7 @@ case "$*" in
     printf '%s\n' "$*" >> "$MOCK_ROOT/calls"
     if [[ -f $MOCK_ROOT/switch-error ]]; then echo 'invalid keyboard'; exit 0; fi
     if [[ ! -f $MOCK_ROOT/no-change ]]; then
-      jq --argjson idx "$3" '.keyboards |= map(.active_layout_index=$idx | .active_keymap=(if $idx==0 then "English (US, intl., with dead keys)" else "French" end))' \
+      jq --argjson idx "$3" '.keyboards |= map(.active_keymap=(if $idx==0 then "English (US, intl., with dead keys)" else "French" end) | .active_layout_index=(if (env.VIRTUAL_FROZEN=="1" and (.name | startswith("hl-virtual-keyboard-"))) then .active_layout_index else $idx end))' \
         "$MOCK_ROOT/devices.json" > "$MOCK_ROOT/next.json"
       mv "$MOCK_ROOT/next.json" "$MOCK_ROOT/devices.json"
     fi
@@ -55,6 +55,18 @@ expect_failure() {
 assert_indices() {
   jq -e --argjson idx "$1" 'all(.keyboards[]; .active_layout_index==$idx)' "$sandbox/devices.json" >/dev/null
 }
+reset_devices_virtual() {
+  cat > "$sandbox/devices.json" <<'EOF'
+{"keyboards":[
+  {"name":"laptop","main":false,"layout":"us,fr","variant":"intl,","active_layout_index":0,"active_keymap":"English (US, intl., with dead keys)"},
+  {"name":"usb","main":true,"layout":"us,fr","variant":"intl,","active_layout_index":0,"active_keymap":"English (US, intl., with dead keys)"},
+  {"name":"hl-virtual-keyboard-fcitx5","main":true,"layout":"fr","variant":"","active_layout_index":0,"active_keymap":"French"}
+]}
+EOF
+}
+assert_real_indices() {
+  jq -e --argjson idx "$1" 'all(.keyboards[] | select(.name | startswith("hl-virtual-keyboard-") | not); .active_layout_index==$idx)' "$sandbox/devices.json" >/dev/null
+}
 
 bash -n "$script"
 bash "$script" --help >/dev/null
@@ -69,6 +81,27 @@ bash "$script" qwerty >/dev/null
 assert_indices 0
 bash "$script" status | grep -q '\[principal\]'
 echo 'PASS: toggle uses the main keyboard, synchronizes both devices, and explicit choices work'
+
+reset_devices_virtual
+bash "$script" status | grep -q '\[virtuel\]'
+bash "$script" toggle >/dev/null
+assert_real_indices 1
+bash "$script" toggle >/dev/null
+assert_real_indices 0
+echo 'PASS: an input method virtual keyboard (fcitx5) is ignored by the layout check and by status'
+
+reset_devices_virtual
+export VIRTUAL_FROZEN=1
+bash "$script" azerty >/dev/null
+assert_real_indices 1
+bash "$script" toggle >/dev/null
+assert_real_indices 0
+bash "$script" toggle >/dev/null
+assert_real_indices 1
+unset VIRTUAL_FROZEN
+echo 'PASS: toggle direction follows a physical keyboard even when a virtual one is flagged main and frozen'
+
+reset_devices
 
 touch "$sandbox/switch-error"
 expect_failure bash "$script" azerty
@@ -102,6 +135,15 @@ for format in lua conf; do
   rm "$XDG_CONFIG_HOME/hypr/hyprland.$format"
 done
 echo 'PASS: Lua and legacy install/reinstall/uninstall preserve personal settings and backups'
+
+reset_devices_virtual
+touch "$XDG_CONFIG_HOME/hypr/hyprland.lua"
+printf '%s\n' '# personal settings preserved by the mock' > "$XDG_CONFIG_HOME/hypr/input.lua"
+bash "$script" install >/dev/null
+grep -q 'kb_layout = "us,fr"' "$XDG_CONFIG_HOME/hypr/input.lua"
+bash "$script" uninstall >/dev/null
+rm "$XDG_CONFIG_HOME/hypr/hyprland.lua"
+echo 'PASS: install succeeds with an input method virtual keyboard present'
 
 touch "$XDG_CONFIG_HOME/hypr/hyprland.lua" "$XDG_CONFIG_HOME/hypr/hyprland.conf"
 expect_failure bash "$script" install

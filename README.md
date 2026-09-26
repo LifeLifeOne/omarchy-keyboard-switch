@@ -39,6 +39,8 @@ Prérequis : Bash, `hyprctl`, `jq` et les outils GNU usuels (`awk`, `grep`, `ins
 - Ajout d’un bloc clairement délimité en fin de fichier : dispositions `us,fr`, variantes `intl,`, raccourci Ctrl+Alt+Espace.
 - Rechargement de Hyprland et sélection initiale de QWERTY US International.
 
+En Lua, le raccourci est enregistré avec la description `Toggle keyboard layout`, visible dans `hyprctl binds`.
+
 Les autres réglages du fichier sont conservés, notamment la souris, le pavé tactile et les options Compose. Relancer `install` remplace le bloc géré au lieu de le dupliquer. `XDG_CONFIG_HOME` est respecté. Aucune modification du clavier Windows, du clavier de console Linux ni de l’écran de connexion SDDM.
 
 La configuration Lua est détectée via `hyprland.lua`, l’ancienne syntaxe via `hyprland.conf`. Si les deux existent, indique le format réellement utilisé :
@@ -54,6 +56,7 @@ L’installateur suppose la structure standard d’Omarchy, qui charge le fichie
 ## Comportement et limites
 
 - La bascule s’appuie sur l’état réel du clavier principal retourné par Hyprland, puis synchronise tous les claviers. Aucun fichier d’état susceptible de se désynchroniser.
+- Les claviers virtuels créés par un moteur de saisie (fcitx5, ibus,…) sont ignorés pour la vérification des dispositions et pour le sens de la bascule. Hyprland les liste parmi les claviers, mais ils déclarent leur propre disposition et sont souvent marqués « principal » : sans cette exclusion, l’installation échoue et la bascule peut rester bloquée sur le même sens. `status` les signale avec `[virtuel]`.
 - Au redémarrage de la session ou au rechargement de la configuration, la disposition par défaut est QWERTY US International. La dernière sélection n’est pas mémorisée.
 - Un clavier branché après une bascule peut démarrer avec la disposition par défaut : relance `qwerty` ou `azerty` pour synchroniser les claviers.
 - Les raccourcis Hyprland sont résolus par défaut selon la première disposition (`us`). Certains raccourcis avec des lettres peuvent donc suivre la position QWERTY même en AZERTY. Le raccourci fourni utilise Espace pour éviter cette ambiguïté.
