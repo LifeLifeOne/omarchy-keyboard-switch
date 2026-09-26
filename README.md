@@ -1,5 +1,7 @@
 # Omarchy Keyboard Switch
 
+![tests](https://github.com/LifeLifeOne/omarchy-keyboard-switch/actions/workflows/tests.yml/badge.svg)
+
 Basculer entre **QWERTY US International** et **AZERTY français** dans Omarchy avec **Ctrl + Alt + Espace** ou une commande.
 
 Pensé pour un portable AZERTY utilisé avec un clavier USB QWERTY. Le script sélectionne la même disposition sur tous les claviers : on choisit celle du clavier sur lequel on écrit.
@@ -81,7 +83,9 @@ bash -n omarchy-keyboard.sh
 bash tests/test.sh
 ```
 
-Les tests utilisent un faux `hyprctl` et un dossier temporaire : installation/réinstallation, préservation des réglages, désinstallation, synchronisation des deux claviers, erreurs et restauration. Ils ne changent pas le clavier de la machine de test. Le comportement sur un vrai bureau Hyprland doit être vérifié sur Omarchy ; il n’a pas été testé matériellement depuis Windows.
+Ces deux commandes sont exécutées automatiquement par GitHub Actions (`.github/workflows/tests.yml`) à chaque push sur `main` et à chaque pull request.
+
+Les tests utilisent un faux `hyprctl` et un dossier temporaire : installation/réinstallation, préservation des réglages, désinstallation, synchronisation des deux claviers, claviers virtuels de moteur de saisie, erreurs et restauration. Ils ne changent pas le clavier de la machine de test. Le comportement sur un vrai bureau Hyprland doit être vérifié sur Omarchy ; il n’a pas été testé matériellement depuis Windows.
 
 ## Références
 

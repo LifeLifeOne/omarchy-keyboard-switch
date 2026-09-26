@@ -1,0 +1,24 @@
+name: tests
+
+on:
+  push:
+    branches: [main]
+  pull_request:
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+jobs:
+  test:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - name: Install jq
+        run: sudo apt-get update -qq && sudo apt-get install -y -qq jq
+      - name: Check syntax
+        run: |
+          bash -n omarchy-keyboard.sh
+          bash -n tests/test.sh
+      - name: Run test suite
+        run: bash tests/test.sh
