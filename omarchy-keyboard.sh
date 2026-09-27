@@ -114,6 +114,87 @@ show_status() {
   jq -r '.keyboards[] | "\(.name) : \(.active_keymap)\(if (.name | startswith("hl-virtual-keyboard-")) then " [virtuel]" elif .main then " [principal]" else "" end)"' <<< "$1"
 }
 
+# The built-in bar widget cycles one keyboard, naming the device its last
+# reading spoke for. On a seat holding several keyboards that reading cannot
+# settle: the widget falls back to the furthest-advanced device and, on a tie,
+# the first one Hyprland lists, which is a USB keyboard or a hotkeys pseudo
+# device rather than the one being typed on. The label still reads correctly
+# because every keyboard reports the same keymap, so the click looks broken
+# with nothing to show for it.
+#
+# Cycling the seat instead needs no device name and moves every keyboard, which
+# is what the toggle in this script does too. The patch is applied to a clone,
+# never to the packaged widget, and a marker file records that the clone is
+# ours so uninstall leaves a hand-made clone alone.
+bar_widget_id() { printf '%s.keyboard-layout\n' "${USER:-$(id -un)}"; }
+bar_widget_dir() { printf '%s/omarchy/plugins/%s\n' "${XDG_CONFIG_HOME:-$HOME/.config}" "$(bar_widget_id)"; }
+bar_widget_is_patched() { grep -q 'switchxkblayout all next' "$1"; }
+
+patch_bar_widget() {
+  local dir qml clone_id
+  clone_id=$(bar_widget_id)
+  dir=$(bar_widget_dir)
+  qml="$dir/KeyboardLayout.qml"
+
+  if ! command -v omarchy >/dev/null 2>&1; then
+    printf 'omarchy est absent : le clic de la barre reste sur le widget natif.\n' >&2
+    return 0
+  fi
+
+  if [[ ! -f $qml ]]; then
+    # The default 2s IPC timeout is shorter than a plugin rescan takes, which
+    # fails the clone on a loaded desktop.
+    if ! OMARCHY_SHELL_IPC_TIMEOUT=${OMARCHY_SHELL_IPC_TIMEOUT:-20s} \
+      omarchy plugin clone omarchy.keyboard-layout >/dev/null 2>&1; then
+      printf "Le widget clavier n’a pas ete corrige : le clone a echoue.\n" >&2
+      printf 'Lancez omarchy restart shell, puis : %s install\n' "$0" >&2
+      return 0
+    fi
+    # The shell can register the widget while the clone is still being moved
+    # into place and keep the path it saw, which then no longer exists and
+    # leaves the bar without the widget. Only a fresh shell clears that.
+    omarchy restart shell >/dev/null 2>&1 || true
+  fi
+
+  if [[ ! -f $qml ]]; then
+    printf 'Widget clavier introuvable : %s\n' "$qml" >&2
+    return 0
+  fi
+
+  if ! bar_widget_is_patched "$qml"; then
+    if ! grep -q 'switchxkblayout' "$qml"; then
+      printf "Le widget clavier d’Omarchy a change : le clic n’a pas ete corrige.\n" >&2
+      printf 'Signalez-le sur https://github.com/LifeLifeOne/omarchy-keyboard-switch/issues\n' >&2
+      return 0
+    fi
+    sed -i \
+      -e 's#if (!root\.keyboardName || !root\.bar) return#if (!root.bar) return#' \
+      -e 's#root\.bar\.run("hyprctl switchxkblayout " + Util\.shellQuote(root\.keyboardName) + " next")#root.bar.run("hyprctl switchxkblayout all next")#' \
+      "$qml"
+    if ! bar_widget_is_patched "$qml"; then
+      printf "Le clic du widget clavier n’a pas pu etre corrige : %s\n" "$qml" >&2
+      printf 'Signalez-le sur https://github.com/LifeLifeOne/omarchy-keyboard-switch/issues\n' >&2
+      return 0
+    fi
+  fi
+
+  : > "$dir/.omarchy-keyboard-switch"
+}
+
+unpatch_bar_widget() {
+  local dir clone_id
+  clone_id=$(bar_widget_id)
+  dir=$(bar_widget_dir)
+  command -v omarchy >/dev/null 2>&1 || return 0
+  # A clone the user made for their own reasons carries no marker, so leave it.
+  [[ -f $dir/.omarchy-keyboard-switch ]] || return 0
+  if ! omarchy plugin remove "$clone_id" --yes >/dev/null 2>&1; then
+    printf 'Clone %s non retire. Lancez : omarchy plugin remove %s --yes\n' "$clone_id" "$clone_id" >&2
+    return 0
+  fi
+  omarchy restart shell >/dev/null 2>&1 || true
+}
+
 action=${1:-toggle}
 case $action in
   -h|--help|help) usage; exit 0 ;;
@@ -157,6 +238,7 @@ if [[ $action == install || $action == uninstall ]]; then
     fi
     check_layouts "$(devices)"
     hypr_ok switchxkblayout all 0
+    patch_bar_widget
     printf 'Installe : %s\nCtrl+Alt+Espace : QWERTY US International <-> AZERTY francais.\n' "$binary"
     exit 0
   fi
@@ -170,6 +252,7 @@ if [[ $action == install || $action == uninstall ]]; then
   if [[ -f $binary ]] && grep -q '^# omarchy-keyboard-switch: ' "$binary"; then
     rm -- "$binary"
   fi
+  unpatch_bar_widget
   if [[ -n ${HYPRLAND_INSTANCE_SIGNATURE:-} ]] && command -v hyprctl >/dev/null 2>&1; then
     hypr_ok reload
   fi

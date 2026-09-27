@@ -40,6 +40,7 @@ Prérequis : Bash, `hyprctl`, `jq` et les outils GNU usuels (`awk`, `grep`, `ins
 - Sauvegarde de `~/.config/hypr/input.lua` ou `input.conf` avant chaque modification ; son chemin est affiché.
 - Ajout d’un bloc clairement délimité en fin de fichier : dispositions `us,fr`, variantes `intl,`, raccourci Ctrl+Alt+Espace.
 - Rechargement de Hyprland et sélection initiale de QWERTY US International.
+- Correctif du widget clavier de la barre : il est cloné depuis celui d’Omarchy et son clic est modifié pour basculer **tous** les claviers, comme le raccourci. Voir « Le widget de la barre » ci-dessous.
 
 En Lua, le raccourci est enregistré avec la description `Toggle keyboard layout`, visible dans `hyprctl binds`.
 
@@ -54,6 +55,21 @@ bash omarchy-keyboard.sh install conf
 ```
 
 L’installateur suppose la structure standard d’Omarchy, qui charge le fichier `input` personnel après les réglages par défaut. Un fichier non chargé ou un override clavier défini ailleurs peut empêcher l’application ; le script signale les dispositions inattendues.
+
+## Le widget de la barre
+
+Sur la barre du haut, la pastille de disposition affiche la disposition courante et se clique pour changer. Ce clic ne fonctionne pas d’origine avec plusieurs claviers, et c’est un défaut d’Omarchy, pas de ce script.
+
+Le widget livré fait `hyprctl switchxkblayout <clavier> next` en nommant un périphérique. Or il ne sait pas lequel nommer : il se fie au dernier événement `activelayout` reçu, et une bascule globale en émet un par clavier. Le dernier peut être un pseudo-périphérique (`acer-wmi-hotkeys`, `intel-hid`) ; à égalité de disposition, il retient le premier clavier listé par Hyprland, souvent l’USB. Le clic bouge alors un clavier que vous ne voyez pas, et comme tous les claviers déclarent la même disposition, la pastille semble morte.
+
+`install` corrige cela en clonant le widget (`~/.config/omarchy/plugins/<utilisateur>.keyboard-layout`) et en remplaçant le clic par `hyprctl switchxkblayout all next`, qui déplace l’ensemble de la session sans nom de périphérique. Le libellé reste juste : une fois les claviers synchronisés, ils rapportent tous la même disposition.
+
+Points à connaître :
+
+- Le fichier d’Omarchy sous `/usr/share/omarchy` n’est **jamais** modifié.
+- Un clone déjà présent n’est pas écrasé : relancer `install` ne touche pas un widget que vous avez commencé à éditer.
+- `install` marque le clone qu’il corrige, y compris un clone qui existait déjà avant lui. `uninstall` retire alors ce clone, ce qui restaure le widget d’Omarchy ; Omarchy le met de côté plutôt que de l’effacer. Un clone que vous n’avez jamais fait corriger, donc sans marqueur, n’est pas touché.
+- Si Omarchy réécrit le clic, le correctif ne s’applique plus. `install` le signale et laisse la décision à l’utilisateur, plutôt que d échouer : le raccourci clavier, lui, fonctionne toujours.
 
 ## Comportement et limites
 
@@ -72,7 +88,7 @@ L’installateur suppose la structure standard d’Omarchy, qui charge le fichie
 omarchy-keyboard uninstall
 ```
 
-Cela retire seulement le bloc géré et la copie installée du script. Les autres réglages, le dépôt cloné et les sauvegardes restent en place. Si les deux formats de configuration existent, ajoute `lua` ou `conf`.
+Cela retire le bloc géré, la copie installée du script et le clone du widget de la barre, ce qui réactive celui d’Omarchy. Les autres réglages, le dépôt cloné et les sauvegardes restent en place. Si les deux formats de configuration existent, ajoute `lua` ou `conf`.
 
 Pour revenir exactement au fichier d’avant installation, copie la sauvegarde affichée sur le fichier `input` correspondant, puis exécute `hyprctl reload`. Attention : une restauration complète remplace aussi tes modifications ultérieures.
 
@@ -85,7 +101,7 @@ bash tests/test.sh
 
 Ces deux commandes sont exécutées automatiquement par GitHub Actions (`.github/workflows/tests.yml`) à chaque push sur `main` et à chaque pull request.
 
-Les tests utilisent un faux `hyprctl` et un dossier temporaire : installation/réinstallation, préservation des réglages, désinstallation, synchronisation des deux claviers, claviers virtuels de moteur de saisie, erreurs et restauration. Ils ne changent pas le clavier de la machine de test. Le comportement sur un vrai bureau Hyprland doit être vérifié sur Omarchy ; il n’a pas été testé matériellement depuis Windows.
+Les tests utilisent un faux `hyprctl`, un faux `omarchy` et un dossier temporaire : installation/réinstallation, préservation des réglages, désinstallation, synchronisation des deux claviers, claviers virtuels de moteur de saisie, correctif du widget de la barre, erreurs et restauration. Ils ne changent pas le clavier de la machine de test et n’appellent pas le vrai binaire `omarchy`, qui pilote la session en cours : la suite refuse de démarrer si ce binaire n’est pas remplacé par le leurre. Le comportement sur un vrai bureau Hyprland doit être vérifié sur Omarchy ; il n’a pas été testé matériellement depuis Windows.
 
 ## Références
 
