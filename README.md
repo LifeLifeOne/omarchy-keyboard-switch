@@ -2,22 +2,22 @@
 
 ![tests](https://github.com/LifeLifeOne/omarchy-keyboard-switch/actions/workflows/tests.yml/badge.svg)
 
-Basculer entre **QWERTY US International** et **AZERTY français** dans Omarchy avec **Ctrl + Alt + Espace** ou une commande.
+Bascule entre **QWERTY US International** et **AZERTY français** dans Omarchy, avec **Ctrl + Alt + Espace**.
 
-Pensé pour un portable AZERTY utilisé avec un clavier USB QWERTY. Le script sélectionne la même disposition sur tous les claviers : on choisit celle du clavier sur lequel on écrit.
+Fait pour un portable AZERTY utilisé avec un clavier USB QWERTY : la bascule s'applique à **tous** les claviers en même temps. On choisit donc la disposition du clavier sur lequel on écrit, et l'autre suit.
 
-| Commande | Résultat |
+| Commande | Effet |
 | --- | --- |
-| `omarchy-keyboard toggle` | Bascule vers l’autre disposition |
-| `omarchy-keyboard qwerty` | US International avec touches mortes (`us`, variante `intl`) |
-| `omarchy-keyboard azerty` | Français AZERTY classique (`fr`, variante vide) |
-| `omarchy-keyboard status` | Affiche l’état de chaque clavier |
+| `omarchy-keyboard toggle` | Bascule vers l'autre disposition |
+| `omarchy-keyboard qwerty` | US International avec touches mortes |
+| `omarchy-keyboard azerty` | Français AZERTY classique |
+| `omarchy-keyboard status` | Affiche la disposition de chaque clavier |
 
-La disposition US International correspond à l’usage « FRA INTL » de Windows : QWERTY avec composition des accents. Les combinaisons exactes de certains caractères peuvent différer entre Windows et Linux. Ce n’est pas la variante `altgr-intl`.
+US International correspond au réglage « FRA INTL » de Windows : QWERTY avec composition des accents. Quelques combinaisons peuvent différer de Windows, et ce n'est pas la variante `altgr-intl`.
 
-## Installation sur Omarchy
+## Installation
 
-Dans un terminal de ta **session graphique Omarchy**, sans `sudo` :
+Dans un terminal de ta session Omarchy, **sans `sudo`** :
 
 ```sh
 git clone https://github.com/LifeLifeOne/omarchy-keyboard-switch.git
@@ -25,62 +25,59 @@ cd omarchy-keyboard-switch
 bash omarchy-keyboard.sh install
 ```
 
-Ensuite, utilise **Ctrl + Alt + Espace**. Si `~/.local/bin` n’est pas dans ton `PATH`, les commandes restent accessibles par leur chemin complet :
+C'est tout. **Ctrl + Alt + Espace** fonctionne, et la pastille de la barre est cliquable.
+
+Si `~/.local/bin` n'est pas dans ton `PATH`, les commandes restent accessibles ainsi :
 
 ```sh
-~/.local/bin/omarchy-keyboard qwerty
 ~/.local/bin/omarchy-keyboard azerty
 ```
 
-Prérequis : Bash, `hyprctl`, `jq` et les outils GNU usuels (`awk`, `grep`, `install`, `mktemp`). La notification utilise `notify-send` si disponible. Si `jq` manque, installe-le avec `sudo pacman -S jq`.
+Il faut Bash, `hyprctl`, `jq` et les outils GNU habituels (`awk`, `grep`, `install`, `mktemp`). Sur Arch, `jq` s'installe avec `sudo pacman -S jq`.
 
-## Ce qui est modifié
+## Ce que fait l'installateur
 
-- Copie du script dans `~/.local/bin/omarchy-keyboard`.
-- Sauvegarde de `~/.config/hypr/input.lua` ou `input.conf` avant chaque modification ; son chemin est affiché.
-- Ajout d’un bloc clairement délimité en fin de fichier : dispositions `us,fr`, variantes `intl,`, raccourci Ctrl+Alt+Espace.
-- Rechargement de Hyprland et sélection initiale de QWERTY US International.
-- Correctif du widget clavier de la barre : il est cloné depuis celui d’Omarchy et son clic est modifié pour basculer **tous** les claviers, comme le raccourci. Voir « Le widget de la barre » ci-dessous.
+- Copie le script dans `~/.local/bin/omarchy-keyboard`.
+- **Sauvegarde** `~/.config/hypr/input.lua` (ou `input.conf`) et affiche le chemin de la sauvegarde.
+- Ajoute un bloc délimité en fin de fichier : dispositions `us,fr`, variante `intl,`, raccourci Ctrl+Alt+Espace.
+- Recharge Hyprland et sélectionne QWERTY US International.
+- Corrige le clic de la pastille dans la barre (voir plus bas).
 
-En Lua, le raccourci est enregistré avec la description `Toggle keyboard layout`, visible dans `hyprctl binds`.
+Le reste de ton fichier de configuration est conservé : souris, pavé tactile, options Compose. Relancer `install` remplace le bloc au lieu de le dupliquer. `XDG_CONFIG_HOME` est respecté.
 
-Les autres réglages du fichier sont conservés, notamment la souris, le pavé tactile et les options Compose. Relancer `install` remplace le bloc géré au lieu de le dupliquer. `XDG_CONFIG_HOME` est respecté. Aucune modification du clavier Windows, du clavier de console Linux ni de l’écran de connexion SDDM.
+Le clavier Windows, le clavier de la console Linux et l'écran de connexion SDDM ne sont pas touchés.
 
-La configuration Lua est détectée via `hyprland.lua`, l’ancienne syntaxe via `hyprland.conf`. Si les deux existent, indique le format réellement utilisé :
+Si tu as les deux formats de configuration, précise lequel est réellement utilisé :
 
 ```sh
-bash omarchy-keyboard.sh install lua
-# ou, pour une ancienne installation :
-bash omarchy-keyboard.sh install conf
+bash omarchy-keyboard.sh install lua   # format actuel
+bash omarchy-keyboard.sh install conf  # ancien format
 ```
 
-L’installateur suppose la structure standard d’Omarchy, qui charge le fichier `input` personnel après les réglages par défaut. Un fichier non chargé ou un override clavier défini ailleurs peut empêcher l’application ; le script signale les dispositions inattendues.
+## La pastille dans la barre
 
-## Le widget de la barre
+**Le clic de la pastille ne marche pas d'origine avec plusieurs claviers.** C'est un défaut d'Omarchy, pas de ce script.
 
-Sur la barre du haut, la pastille de disposition affiche la disposition courante et se clique pour changer. Ce clic ne fonctionne pas d’origine avec plusieurs claviers, et c’est un défaut d’Omarchy, pas de ce script.
+Le widget livré d'Omarchy demande à Hyprland de changer la disposition d'**un** clavier précis. Problème : avec plusieurs claviers, il ne sait pas lequel choisir. Il se fie au dernier périphérique qu'il a entendu, ce qui peut être un bouton de power ou un pseudo-périphérique, pas ton clavier. Le clic bouge alors un clavier invisible — et comme tous les claviers affichent la même disposition, rien ne semble se passer.
 
-Le widget livré fait `hyprctl switchxkblayout <clavier> next` en nommant un périphérique. Or il ne sait pas lequel nommer : il se fie au dernier événement `activelayout` reçu, et une bascule globale en émet un par clavier. Le dernier peut être un pseudo-périphérique (`acer-wmi-hotkeys`, `intel-hid`) ; à égalité de disposition, il retient le premier clavier listé par Hyprland, souvent l’USB. Le clic bouge alors un clavier que vous ne voyez pas, et comme tous les claviers déclarent la même disposition, la pastille semble morte.
+`install` corrige cela : il copie le widget dans ta config et le modifie pour basculer **tous** les claviers, exactement comme le raccourci. Le libellé reste juste, puisque les claviers sont synchronisés.
 
-`install` corrige cela en clonant le widget (`~/.config/omarchy/plugins/<utilisateur>.keyboard-layout`) et en remplaçant le clic par `hyprctl switchxkblayout all next`, qui déplace l’ensemble de la session sans nom de périphérique. Le libellé reste juste : une fois les claviers synchronisés, ils rapportent tous la même disposition.
+À savoir :
 
-Points à connaître :
+- Le fichier d'Omarchy dans `/usr/share/omarchy` n'est **jamais** modifié.
+- Relancer `install` n'écrase pas un widget que tu aurais commencé à éditer.
+- `uninstall` retire le clone et réactive le widget d'Omarchy. Omarchy le met de côté au lieu de l'effacer. Un clone que tu n'as jamais fait corriger est laissé intact.
+- Si une mise à jour d'Omarchy réécrit ce clic, le correctif ne s'applique plus. `install` te le signale sans échouer : le raccourci, lui, continue de fonctionner.
 
-- Le fichier d’Omarchy sous `/usr/share/omarchy` n’est **jamais** modifié.
-- Un clone déjà présent n’est pas écrasé : relancer `install` ne touche pas un widget que vous avez commencé à éditer.
-- `install` marque le clone qu’il corrige, y compris un clone qui existait déjà avant lui. `uninstall` retire alors ce clone, ce qui restaure le widget d’Omarchy ; Omarchy le met de côté plutôt que de l’effacer. Un clone que vous n’avez jamais fait corriger, donc sans marqueur, n’est pas touché.
-- Si Omarchy réécrit le clic, le correctif ne s’applique plus. `install` le signale et laisse la décision à l’utilisateur, plutôt que d échouer : le raccourci clavier, lui, fonctionne toujours.
+## À savoir
 
-## Comportement et limites
-
-- La bascule s’appuie sur l’état réel du clavier principal retourné par Hyprland, puis synchronise tous les claviers. Aucun fichier d’état susceptible de se désynchroniser.
-- Les claviers virtuels créés par un moteur de saisie (fcitx5, ibus,…) sont ignorés pour la vérification des dispositions et pour le sens de la bascule. Hyprland les liste parmi les claviers, mais ils déclarent leur propre disposition et sont souvent marqués « principal » : sans cette exclusion, l’installation échoue et la bascule peut rester bloquée sur le même sens. `status` les signale avec `[virtuel]`.
-- Au redémarrage de la session ou au rechargement de la configuration, la disposition par défaut est QWERTY US International. La dernière sélection n’est pas mémorisée.
-- Un clavier branché après une bascule peut démarrer avec la disposition par défaut : relance `qwerty` ou `azerty` pour synchroniser les claviers.
-- Les raccourcis Hyprland sont résolus par défaut selon la première disposition (`us`). Certains raccourcis avec des lettres peuvent donc suivre la position QWERTY même en AZERTY. Le raccourci fourni utilise Espace pour éviter cette ambiguïté.
-- Les réglages distincts par périphérique (AZERTY permanent sur le portable, QWERTY permanent sur l’USB) constituent une autre approche. Ce script est destiné à une **bascule globale manuelle** et refuse les configurations par périphérique incompatibles.
-- Réservé à Hyprland : pas à GNOME, KDE, X11 ni à Windows. L’API JSON doit exposer `active_layout_index` (vérifiée dans le code Hyprland 0.55).
-- Dans Try Omarchy pour Windows, le lanceur peut resynchroniser la disposition depuis Windows. Le projet vise d’abord une installation native d’Omarchy.
+- **Après un redémarrage de session**, la disposition repart sur QWERTY US International. La dernière choice n'est pas mémorisée.
+- **Un clavier branché après une bascule** peut démarrer sur la disposition par défaut. Relance `omarchy-keyboard azerty` pour resynchroniser.
+- **Les raccourcis avec des lettres** suivent la position QWERTY même en AZERTY, car Hyprland résout les raccourcis selon la première disposition. C'est pour ça que le raccourci utilise Espace, qui n'est pas ambigu.
+- **Les méthodes de saisie** (fcitx5, ibus) créent un clavier virtuel que Hyprland liste comme un vrai clavier. Il est ignoré, sinon l'installation échouerait et la bascule resterait bloquée dans le même sens. `status` le marque `[virtuel]`.
+- **Des dispositions fixes par périphérique** (AZERTY tout le temps sur le portable, QWERTY sur l'USB) sont une autre approche. Ce script fait une bascule globale manuelle et refuse les configurations par périphérique incompatibles.
+- **Hyprland uniquement** : pas GNOME, KDE, X11 ni Windows.
+- **Try Omarchy pour Windows** : le lanceur peut resynchroniser la disposition depuis Windows. Le projet vise d'abord une installation native.
 
 ## Désinstallation
 
@@ -88,9 +85,9 @@ Points à connaître :
 omarchy-keyboard uninstall
 ```
 
-Cela retire le bloc géré, la copie installée du script et le clone du widget de la barre, ce qui réactive celui d’Omarchy. Les autres réglages, le dépôt cloné et les sauvegardes restent en place. Si les deux formats de configuration existent, ajoute `lua` ou `conf`.
+Retire le bloc de configuration, la commande installée et le clone du widget, ce qui réactive celui d'Omarchy. Tes autres réglages, le dépôt cloné et les sauvegardes restent en place.
 
-Pour revenir exactement au fichier d’avant installation, copie la sauvegarde affichée sur le fichier `input` correspondant, puis exécute `hyprctl reload`. Attention : une restauration complète remplace aussi tes modifications ultérieures.
+Pour revenir exactement au fichier d'avant installation, copie la sauvegarde affichée sur le fichier `input` concerné, puis lance `hyprctl reload`. Attention, une restauration complète écrase aussi tes modifications ultérieures.
 
 ## Validation
 
@@ -99,15 +96,15 @@ bash -n omarchy-keyboard.sh
 bash tests/test.sh
 ```
 
-Ces deux commandes sont exécutées automatiquement par GitHub Actions (`.github/workflows/tests.yml`) à chaque push sur `main` et à chaque pull request.
+La CI lance ces deux commandes à chaque push sur `main` et à chaque pull request.
 
-Les tests utilisent un faux `hyprctl`, un faux `omarchy` et un dossier temporaire : installation/réinstallation, préservation des réglages, désinstallation, synchronisation des deux claviers, claviers virtuels de moteur de saisie, correctif du widget de la barre, erreurs et restauration. Ils ne changent pas le clavier de la machine de test et n’appellent pas le vrai binaire `omarchy`, qui pilote la session en cours : la suite refuse de démarrer si ce binaire n’est pas remplacé par le leurre. Le comportement sur un vrai bureau Hyprland doit être vérifié sur Omarchy ; il n’a pas été testé matériellement depuis Windows.
+Les tests utilisent de faux `hyprctl` et `omarchy` dans un dossier temporaire : installation, réinstallation, désinstallation, synchronisation des claviers, claviers virtuels, correctif de la pastille, erreurs et restauration. Ils ne touchent jamais ton clavier. La suite refuse même de démarrer si elle détecte le vrai binaire `omarchy`, qui pilote ta session en cours.
 
 ## Références
 
 - [Claviers et variantes Hyprland](https://wiki.hypr.land/configuring/core/binds/keyboard-layouts/)
 - [Commandes hyprctl](https://wiki.hypr.land/0.55.0/Configuring/Advanced-and-Cool/Using-hyprctl/)
-- [Fichier input.lua officiel d’Omarchy](https://github.com/omacom/omarchy/blob/master/config/hypr/input.lua)
+- [Fichier input.lua officiel d'Omarchy](https://github.com/omacom/omarchy/blob/master/config/hypr/input.lua)
 - [Configuration personnelle Omarchy](https://omarchy.org/manual/dotfiles/)
 
 Projet indépendant, sans affiliation officielle à Omarchy ou Hyprland.
